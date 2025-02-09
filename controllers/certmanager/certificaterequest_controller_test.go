@@ -313,7 +313,6 @@ func TestRequestShouldBeProcessed(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			apiutil.Clock = fclock
 			scheme := runtime.NewScheme()
 			_ = clientgoscheme.AddToScheme(scheme)
