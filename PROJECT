@@ -1,6 +1,6 @@
 domain: skyscanner.net
 layout:
-- go.kubebuilder.io/v3
+- go.kubebuilder.io/v4
 multigroup: true
 projectName: kms-issuer
 repo: github.com/Skyscanner/kms-issuer

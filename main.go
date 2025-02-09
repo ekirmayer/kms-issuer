@@ -32,14 +32,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	certmanagerskyscannernetv1alpha1 "github.com/Skyscanner/kms-issuer/v4/apis/certmanager/v1alpha1"
 	"github.com/Skyscanner/kms-issuer/v4/controllers/certmanager"
 	"github.com/Skyscanner/kms-issuer/v4/pkg/kmsca"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	cmapi "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -77,9 +78,13 @@ func main() {
 	setupLog := ctrl.Log.WithName("setup")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   webhookPort,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port: webhookPort,
+		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "dcb53387.skyscanner.net",
@@ -96,12 +101,10 @@ func main() {
 	awsLoadConfigOpts := []func(*config.LoadOptions) error{}
 	if localAWSEndpoint != "" {
 		setupLog.Info("Using custom AWS Endpoint", "endpoint", localAWSEndpoint)
-		awsEndpointsResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			return aws.Endpoint{PartitionID: "aws", URL: localAWSEndpoint, SigningRegion: "eu-west-1"}, nil
-		})
+
 		awsLoadConfigOpts = append(
 			awsLoadConfigOpts,
-			config.WithEndpointResolverWithOptions(awsEndpointsResolver),
+			config.WithBaseEndpoint(localAWSEndpoint),
 			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "test")),
 			config.WithRegion("eu-west-1"),
 		)

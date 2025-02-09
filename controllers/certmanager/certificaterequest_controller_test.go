@@ -20,17 +20,18 @@ import (
 	"context"
 	"crypto/x509"
 	"net"
+	"net/url"
 	"testing"
 	"time"
 
 	kmsiapi "github.com/Skyscanner/kms-issuer/v4/apis/certmanager/v1alpha1"
-	apiutil "github.com/jetstack/cert-manager/pkg/api/util"
-	cmapi "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	apiutil "github.com/cert-manager/cert-manager/pkg/api/util"
+	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 
 	"github.com/Skyscanner/kms-issuer/v4/pkg/kmsca"
-	"github.com/jetstack/cert-manager/test/e2e/util"
-	. "github.com/onsi/ginkgo"
+	"github.com/cert-manager/cert-manager/test/unit/gen"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,12 +88,33 @@ var _ = Context("CertificateRequestReconciler", func() {
 				[]byte{1, 1, 1, 1},
 			}
 			exampleURIs := []string{"spiffe://foo.foo.example.net", "spiffe://foo.bar.example.net"}
-			cr, _, err := util.NewCertManagerBasicCertificateRequest( //nolint:staticcheck // TODO: fixed when refactored
-				crKey.Name, issuerKey.Name, "KMSIssuer",
-				&metav1.Duration{
+
+			cn := "test.domain.com"
+			if len(exampleDNSNames) > 0 {
+				cn = exampleDNSNames[0]
+			}
+			var parsedURIs []*url.URL
+			for _, uri := range exampleURIs {
+				parsed, _ := url.Parse(uri)
+				parsedURIs = append(parsedURIs, parsed)
+			}
+			srPEM, _, err := gen.CSR(x509.RSA,
+				gen.SetCSRCommonName(cn),
+				gen.SetCSRDNSNames(exampleDNSNames...),
+				gen.SetCSRIPAddresses(exampleIPAddresses...),
+				gen.SetCSRURIs(parsedURIs...),
+			)
+			cr := gen.CertificateRequest(
+				crKey.Name,
+				gen.SetCertificateRequestNamespace(issuerKey.Name),
+				gen.SetCertificateRequestIssuer(cmmeta.ObjectReference{
+					Name: issuerKey.Name,
+					Kind: "KMSIssuer",
+				}),
+				gen.SetCertificateRequestDuration(&metav1.Duration{
 					Duration: time.Hour * 24 * 90,
-				},
-				exampleDNSNames, exampleIPAddresses, exampleURIs, x509.RSA,
+				}),
+				gen.SetCertificateRequestCSR(srPEM),
 			)
 			cr.ObjectMeta.Namespace = crKey.Namespace
 			cr.Spec.IssuerRef.Group = kmsiapi.GroupVersion.Group
@@ -291,6 +313,7 @@ func TestRequestShouldBeProcessed(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+
 			apiutil.Clock = fclock
 			scheme := runtime.NewScheme()
 			_ = clientgoscheme.AddToScheme(scheme)
@@ -309,9 +332,10 @@ func TestRequestShouldBeProcessed(t *testing.T) {
 			fclient := fakeclient.NewClientBuilder().
 				WithRuntimeObjects(request).
 				WithScheme(scheme).
+				WithStatusSubresource(&cmapi.CertificateRequest{}). // Add this if using status
 				Build()
 
-			fakeRecorder := record.NewFakeRecorder(1)
+			fakeRecorder := record.NewFakeRecorder(2)
 
 			c := CertificateRequestReconciler{
 				Client:                 fclient,
