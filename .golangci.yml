@@ -2,12 +2,6 @@ run:
   timeout: 5m
   deadline: 1m
   tests: true
-  skip-dirs:
-  - .git
-  - deploy
-  - config
-  - hack
-  skip-dirs-use-default: true
   modules-download-mode: readonly
   allow-parallel-runners: true
 linters-settings:
@@ -54,13 +48,13 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
+    - mnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -80,3 +74,9 @@ issues:
   # Exclude scope checks in tests: "Using the variable on range scope `test` in function literal"
   exclude:
     - Using the variable on range scope `test` in function literal
+  exclude-dirs-use-default: true
+  exclude-dirs:
+  - .git
+  - deploy
+  - config
+  - hack

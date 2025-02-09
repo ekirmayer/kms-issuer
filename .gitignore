@@ -25,3 +25,4 @@ testbin/*
 *~
 .vscode
 ct_previous*
+.DS_Store
